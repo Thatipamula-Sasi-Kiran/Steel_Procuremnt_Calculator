@@ -1,0 +1,15 @@
+Category,Profile Name,Weight_kg_per_m,Depth_mm,Flange_Width_mm
+I-Beam (Medium),ISMB 100,11.5,100,50
+I-Beam (Medium),ISMB 150,14.9,150,75
+I-Beam (Medium),ISMB 200,25.4,200,100
+I-Beam (Medium),ISMB 250,37.3,250,125
+I-Beam (Medium),ISMB 300,44.2,300,140
+I-Beam (Heavy),ISHB 150,27.1,150,150
+I-Beam (Heavy),ISHB 200,37.3,200,200
+Channel,ISMC 75,7.14,75,40
+Channel,ISMC 100,9.56,100,50
+Channel,ISMC 150,16.4,150,75
+TMT Rebar,TMT 8mm,0.395,8,0
+TMT Rebar,TMT 10mm,0.617,10,0
+TMT Rebar,TMT 12mm,0.888,12,0
+TMT Rebar,TMT 16mm,1.58,16,0
