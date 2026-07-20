@@ -4,58 +4,71 @@
 #include <string>
 #include <sstream>
 #include <unordered_map>
+#include <stdexcept>
+
+// Safety function to remove invisible junk characters (like Excel's \r)
+static inline void trim(std::string &s) {
+    size_t start = s.find_first_not_of(" \t\r\n\xEF\xBB\xBF");
+    if (start == std::string::npos) {
+        s.clear();
+        return;
+    }
+    s.erase(0, start);
+    s.erase(s.find_last_not_of(" \t\r\n") + 1);
+}
 
 struct SteelProfile {
-    std::string category;
     std::string name;
-    double weight;
+    double weight_per_meter;
 };
 
 class SteelDatabase {
-    private:
-        std::unordered_map<std::string, SteelProfile> profiles;
-    
-    public:
-        void loadProfileFromCSV(const std::string& filepath) {
-            std::ifstream myFile(filepath); // Input File Stream
+private:
+    std::unordered_map<std::string, SteelProfile> database;
 
-            if (myFile.is_open()) {
-                std::string line;
-                std::getline(myFile, line); // Read the first line (header) and ignore it
+public:
+    void loadProfileFromCSV(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            std::cerr << "CRITICAL: Could not open " << filepath << "\n";
+            return;
+        }
 
-                while (std::getline(myFile, line)) {
-                    std::stringstream ss(line);
-                    std::string category, name, weight;
+        std::string line;
+        bool is_header = true;
+        
+        while (std::getline(file, line)) {
+            if (is_header) { is_header = false; continue; } 
+            
+            std::stringstream ss(line);
+            std::string name, weight_str;
 
-                    if (std::getline(ss, category, ',')) {
-                        if (std::getline(ss, name, ',')) {
-                            if (std::getline(ss, weight, ',')) {
-                                SteelProfile profile{category, name, std::stod(weight)};
-                                profiles[name] = profile; // Store the profile in the map with name as key
-                            }
-                        }
-                    }
+            // NEW CSV LAYOUT: Col 1 = Name, Col 2 = Weight
+            if (std::getline(ss, name, ',') && std::getline(ss, weight_str, ',')) {
+                trim(name);
+                trim(weight_str);
+                
+                try {
+                    double weight = std::stod(weight_str);
+                    database[name] = {name, weight};
+                } catch (...) {
+                    // Ignore broken lines silently
                 }
-                myFile.close(); // Close the file
-            } else {
-                std::cout << "Could not open the file" << std::endl;
             }
         }
+    }
 
-        void displayProfiles() const {
-            for (const auto& pair : profiles) {
-                const SteelProfile& profile = pair.second;
-                std::cout << "Category: " << profile.category << " | Profile: " << profile.name << " | Weight: " << profile.weight << std::endl;
-            }
-        }
+    double get_weight(const std::string& profile_name) const {
+        std::string search_name = profile_name;
+        trim(search_name); // Clean the search term just in case
 
-        double get_weight(std::string profile_name) const {
-            auto it = profiles.find(profile_name);
-            if (it != profiles.end()) {
-                return it->second.weight;
-            } else {
-                std::cout << "Profile not found" << std::endl;
-                return 0.0; // Add this line!
-            }
+        auto it = database.find(search_name);
+        if (it != database.end()) {
+            return it->second.weight_per_meter;
         }
+        
+        // If it fails, print to terminal and return 0 so the UI doesn't crash
+        std::cerr << "Profile not found in C++ Database: [" << search_name << "]\n";
+        return 0.0; 
+    }
 };
