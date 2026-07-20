@@ -48,4 +48,15 @@ class SteelDatabase {
                 std::cout << "Category: " << profile.category << " | Profile: " << profile.name << " | Weight: " << profile.weight << std::endl;
             }
         }
+
+        double get_weight(std::string profile_name) const {
+            auto it = profiles.find(profile_name);
+            if (it != profiles.end()) {
+                const SteelProfile& profile = it->second;
+                std::cout << "Weight of " << profile.name << ": " << profile.weight << std::endl;
+                return profile.weight;
+            } else {
+                std::cout << "Profile not found" << std::endl;
+            }
+        }
 };
