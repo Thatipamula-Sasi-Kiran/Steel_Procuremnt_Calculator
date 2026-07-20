@@ -1,0 +1,10 @@
+^W:\CODING\C++\PROJECTS\STEEL_PROCUREMNT_CALCULATOR\CMAKELISTS.TXT
+setlocal
+C:\Users\Sasi\AppData\Local\Programs\Python\Python314\Lib\site-packages\cmake\data\bin\cmake.exe -SW:/Coding/C++/Projects/Steel_Procuremnt_Calculator -BW:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build --check-stamp-file W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

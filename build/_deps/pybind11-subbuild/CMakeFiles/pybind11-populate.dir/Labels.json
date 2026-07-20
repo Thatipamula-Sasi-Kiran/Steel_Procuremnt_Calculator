@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/pybind11-populate"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/7418a5e6bc0487ecca5cff380d940903/pybind11-populate.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/cf5f43838efd643bd2c132d9dbfe398e/pybind11-populate-complete.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-build.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-configure.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-download.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-install.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-mkdir.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-patch.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-test.rule"
+		},
+		{
+			"file" : "W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/CMakeFiles/966cc4968c0e7c3d09ed24c15fe3a722/pybind11-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"pybind11-populate"
+		],
+		"name" : "pybind11-populate"
+	}
+}

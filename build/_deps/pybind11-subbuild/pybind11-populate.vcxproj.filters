@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-mkdir.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-download.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-update.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-patch.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-configure.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-build.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-install.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\966cc4968c0e7c3d09ed24c15fe3a722\pybind11-populate-test.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\cf5f43838efd643bd2c132d9dbfe398e\pybind11-populate-complete.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\7418a5e6bc0487ecca5cff380d940903\pybind11-populate.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="W:\Coding\C++\Projects\Steel_Procuremnt_Calculator\build\_deps\pybind11-subbuild\CMakeFiles\pybind11-populate" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{64506078-B368-33BC-948C-91B0414A88CA}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

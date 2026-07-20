@@ -1,0 +1,10 @@
+^W:\CODING\C++\PROJECTS\STEEL_PROCUREMNT_CALCULATOR\BUILD\_DEPS\PYBIND11-SUBBUILD\CMAKEFILES\7418A5E6BC0487ECCA5CFF380D940903\GENERATE.STAMP.RULE
+setlocal
+C:\Users\Sasi\AppData\Local\Programs\Python\Python314\Lib\site-packages\cmake\data\bin\cmake.exe -SW:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild -BW:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-subbuild/pybind11-populate.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
