@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/cmake_install.cmake",
-		"W:/Coding/C++/Projects/Steel_Procuremnt_Calculator/build/_deps/pybind11-build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

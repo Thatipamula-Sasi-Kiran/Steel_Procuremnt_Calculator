@@ -2,25 +2,70 @@ import customtkinter as ctk
 import tkinter.messagebox as tkmb
 import csv
 import bom_core
+import os
+import sys
+
+# --- NEW: Helper to find files when packaged as an .exe ---
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
+
+# --- Define the path to your database ---
+CSV_PATH = resource_path("Indian_Structural_Steel_Database.csv")
+print(f"DEBUG: I am looking for the database at: {CSV_PATH}")
 
 # 1. Initialize the C++ Backend Engine
 db = bom_core.SteelDatabase()
-db.loadProfileFromCSV("Indian_Structural_Steel_Database.csv")
+# Check if file exists before loading
+#if os.path.exists(CSV_PATH):
+    #db.loadProfileFromCSV(CSV_PATH)
+#else:
+    #print(f"CRITICAL ERROR: Database file not found at {CSV_PATH}")
+
 calculator = bom_core.BOMCalculator(db, 12.0)
 
-# 2. Helper to load profile names from the CSV for the dropdown menu
+# --- SUPER DEBUG VERSION ---
 def get_profile_names(filename):
-    names = []
+    print(f"DEBUG: Opening file: {filename}")
+    
+    if not os.path.exists(filename):
+        print("DEBUG ERROR: File NOT FOUND on disk")
+        return ["ISMB 200", "ISMC 150"] 
+
     try:
-        with open(filename, 'r') as file:
+        names = []
+        with open(filename, 'r', encoding='utf-8') as file:
             reader = csv.reader(file)
-            next(reader) # Skip the header row
+            try:
+                header = next(reader)
+                print(f"DEBUG: CSV Header found: {header}")
+            except StopIteration:
+                print("DEBUG ERROR: CSV file is empty.")
+                return ["ISMB 200", "ISMC 150"]
+            
+            count = 0
             for row in reader:
-                if len(row) >= 3:
-                    names.append(row[1].strip()) # Profile Name is the second column
-    except FileNotFoundError:
-        names = ["ISMB 200", "ISMC 150"] # Fallback if CSV is missing
-    return names
+                count += 1
+                print(f"DEBUG: Reading Row {count}: {row}")
+                if len(row) >= 2:
+                    names.append(row[1].strip())
+                else:
+                    print(f"DEBUG: Skipping Row {count} (too short, length={len(row)})")
+            
+        print(f"DEBUG: Finished reading. Found {len(names)} items.")
+        return names
+        
+    except Exception as e:
+        print(f"DEBUG ERROR: Reading CSV failed: {e}")
+        return ["ISMB 200", "ISMC 150"]
+
+profile_names = get_profile_names(CSV_PATH)
 
 # 3. Setup the CustomTkinter Window
 ctk.set_appearance_mode("Dark")  # Options: "System", "Dark", "Light"
@@ -45,7 +90,7 @@ input_frame.pack(pady=10, padx=20, fill="both", expand=True)
 # Profile Dropdown
 profile_label = ctk.CTkLabel(input_frame, text="Select Profile:")
 profile_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
-profile_names = get_profile_names("Indian_Structural_Steel_Database.csv")
+profile_names = get_profile_names(CSV_PATH)
 profile_var = ctk.StringVar(value=profile_names[0] if profile_names else "")
 profile_dropdown = ctk.CTkComboBox(input_frame, variable=profile_var, values=profile_names, width=200)
 profile_dropdown.grid(row=0, column=1, padx=20, pady=10)
