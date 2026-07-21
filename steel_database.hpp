@@ -5,8 +5,8 @@
 #include <sstream>
 #include <unordered_map>
 #include <stdexcept>
+#include <vector>
 
-// Safety function to remove invisible junk characters (like Excel's \r)
 static inline void trim(std::string &s) {
     size_t start = s.find_first_not_of(" \t\r\n\xEF\xBB\xBF");
     if (start == std::string::npos) {
@@ -19,7 +19,8 @@ static inline void trim(std::string &s) {
 
 struct SteelProfile {
     std::string name;
-    double weight_per_meter;
+    double weight;
+    std::string category;
 };
 
 class SteelDatabase {
@@ -41,34 +42,34 @@ public:
             if (is_header) { is_header = false; continue; } 
             
             std::stringstream ss(line);
-            std::string name, weight_str;
+            std::string col;
+            std::vector<std::string> cols;
+            
+            while(std::getline(ss, col, ',')) {
+                trim(col);
+                cols.push_back(col);
+            }
 
-            // NEW CSV LAYOUT: Col 1 = Name, Col 2 = Weight
-            if (std::getline(ss, name, ',') && std::getline(ss, weight_str, ',')) {
-                trim(name);
-                trim(weight_str);
-                
+            // Index 0: Name, 1: Weight, 2: Depth, 3: Width, 4: Category
+            if (cols.size() >= 5) {
                 try {
-                    double weight = std::stod(weight_str);
-                    database[name] = {name, weight};
-                } catch (...) {
-                    // Ignore broken lines silently
-                }
+                    double weight = std::stod(cols[1]);
+                    database[cols[0]] = {cols[0], weight, cols[4]};
+                } catch (...) {}
             }
         }
     }
 
-    double get_weight(const std::string& profile_name) const {
+    // Now returns the full profile struct so we know if it's a Plate or not!
+    SteelProfile get_profile(const std::string& profile_name) const {
         std::string search_name = profile_name;
-        trim(search_name); // Clean the search term just in case
+        trim(search_name); 
 
         auto it = database.find(search_name);
         if (it != database.end()) {
-            return it->second.weight_per_meter;
+            return it->second;
         }
         
-        // If it fails, print to terminal and return 0 so the UI doesn't crash
-        std::cerr << "Profile not found in C++ Database: [" << search_name << "]\n";
-        return 0.0; 
+        return {"Unknown", 0.0, "Unknown"}; 
     }
 };

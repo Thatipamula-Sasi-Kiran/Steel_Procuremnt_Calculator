@@ -4,9 +4,9 @@ import csv
 import bom_core
 import os
 import sys
+import math
 
 def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
         base_path = sys._MEIPASS
     except Exception:
@@ -37,8 +37,6 @@ def load_profiles():
             for row in reader:
                 if len(row) >= 5:
                     name = row[0].strip()
-                    depth = row[2].strip()
-                    width = row[3].strip()
                     cat = row[4].strip()
                     
                     if cat not in categories:
@@ -46,8 +44,9 @@ def load_profiles():
                     categories[cat].append(name)
                     
                     profile_details[name] = {
-                        "depth": depth,
-                        "width": width
+                        "depth": row[2].strip(),
+                        "width": row[3].strip(),
+                        "cat": cat
                     }
     except Exception as e:
         print(f"Error reading CSV: {e}")
@@ -62,16 +61,16 @@ class ReportWindow(ctk.CTkToplevel):
     def __init__(self, parent, results, grand_total_wt, grand_total_scrap):
         super().__init__(parent)
         self.title("Bill of Materials - Report")
-        self.geometry("1000x500") # Made wider for new columns
+        self.geometry("1150x500") 
         
         title = ctk.CTkLabel(self, text="Project Bill of Materials", font=ctk.CTkFont(size=22, weight="bold"))
         title.pack(pady=(15, 10))
         
-        self.table_frame = ctk.CTkScrollableFrame(self, width=950, height=300)
+        self.table_frame = ctk.CTkScrollableFrame(self, width=1100, height=300)
         self.table_frame.pack(padx=20, pady=10, fill="both", expand=True)
         
-        # Added Scrap columns to headers
-        headers = ["S.No", "Item Profile", "Depth/Thk", "Width", "Length (m)", "Qty", "Bars", "Scrap %", "Scrap (kg)", "Billed Weight"]
+        # Updated Header Order: Bars/Sheets moved to the end
+        headers = ["S.No", "Item Profile", "Dimensions", "Qty", "Scrap %", "Scrap", "Billed Wt", "Tonnage (MT)", "Bars/Sheets"]
         for col_idx, header in enumerate(headers):
             lbl = ctk.CTkLabel(self.table_frame, text=header, font=ctk.CTkFont(weight="bold"))
             lbl.grid(row=0, column=col_idx, padx=10, pady=5, sticky="w")
@@ -82,30 +81,33 @@ class ReportWindow(ctk.CTkToplevel):
         for row_idx, res in enumerate(results, start=2):
             ctk.CTkLabel(self.table_frame, text=str(res['sno'])).grid(row=row_idx, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.table_frame, text=res['profile']).grid(row=row_idx, column=1, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=res['depth']).grid(row=row_idx, column=2, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=res['width']).grid(row=row_idx, column=3, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=f"{res['length']:.2f}").grid(row=row_idx, column=4, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=str(res['qty'])).grid(row=row_idx, column=5, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=str(res['bars'])).grid(row=row_idx, column=6, padx=10, pady=5, sticky="w")
             
-            # New Scrap Fields
-            ctk.CTkLabel(self.table_frame, text=f"{res['scrap_pct']}%", text_color="#f0ad4e").grid(row=row_idx, column=7, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=f"{res['scrap_wt']:.2f} kg", text_color="#f0ad4e", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=8, padx=10, pady=5, sticky="w")
+            # Show input dimensions neatly
+            dim_text = f"{res['length']:.0f} mm" if not res['is_plate'] else f"{res['length']}' x {res['width']}' ft"
+            ctk.CTkLabel(self.table_frame, text=dim_text).grid(row=row_idx, column=2, padx=10, pady=5, sticky="w")
             
-            wt_label = ctk.CTkLabel(self.table_frame, text=f"{res['billed_wt']:.2f} kg", text_color="#3a7ebf", font=ctk.CTkFont(weight="bold"))
-            wt_label.grid(row=row_idx, column=9, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.table_frame, text=str(res['qty'])).grid(row=row_idx, column=3, padx=10, pady=5, sticky="w")
+            
+            ctk.CTkLabel(self.table_frame, text=f"{res['scrap_pct']}%", text_color="#f0ad4e").grid(row=row_idx, column=4, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.table_frame, text=f"{res['scrap_wt']:.2f} kg", text_color="#f0ad4e", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=5, padx=10, pady=5, sticky="w")
+            
+            ctk.CTkLabel(self.table_frame, text=f"{res['billed_wt']:.2f} kg", text_color="#3a7ebf", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=6, padx=10, pady=5, sticky="w")
+            
+            # Tonnage rounded up elegantly to 3 decimals
+            ctk.CTkLabel(self.table_frame, text=f"{res['tonnage']:.3f} MT", text_color="#5cb85c", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=7, padx=10, pady=5, sticky="w")
+            
+            # Moved Bars/Sheets to the final column
+            ctk.CTkLabel(self.table_frame, text=str(res['bars'])).grid(row=row_idx, column=8, padx=10, pady=5, sticky="w")
 
-        # Bottom Totals Area
         total_frame = ctk.CTkFrame(self)
         total_frame.pack(fill="x", padx=20, pady=15)
         
-        # Split into two columns for the two totals
-        scrap_lbl = ctk.CTkLabel(total_frame, text=f"TOTAL SCRAP: {grand_total_scrap:.2f} kg", 
-                                 font=ctk.CTkFont(size=16, weight="bold"), text_color="#f0ad4e")
+        grand_tonnage = math.ceil((grand_total_wt / 1000.0) * 1000.0) / 1000.0
+        
+        scrap_lbl = ctk.CTkLabel(total_frame, text=f"TOTAL SCRAP: {grand_total_scrap:.2f} kg", font=ctk.CTkFont(size=16, weight="bold"), text_color="#f0ad4e")
         scrap_lbl.pack(side="left", padx=20, pady=10)
 
-        grand_lbl = ctk.CTkLabel(total_frame, text=f"GRAND TOTAL BILLED WEIGHT: {grand_total_wt:.2f} kg", 
-                                 font=ctk.CTkFont(size=18, weight="bold"), text_color="#28a745")
+        grand_lbl = ctk.CTkLabel(total_frame, text=f"GRAND TOTAL: {grand_total_wt:.2f} kg  ({grand_tonnage:.3f} MT)", font=ctk.CTkFont(size=18, weight="bold"), text_color="#28a745")
         grand_lbl.pack(side="right", padx=20, pady=10)
 
 class SteelApp(ctk.CTk):
@@ -113,7 +115,7 @@ class SteelApp(ctk.CTk):
         super().__init__()
         
         self.title("Steel BOM Calculator")
-        self.geometry("950x600") # Made wider for the new input
+        self.geometry("950x600") 
         ctk.set_appearance_mode("Dark")
         ctk.set_default_color_theme("blue")
         
@@ -122,7 +124,7 @@ class SteelApp(ctk.CTk):
         self.header = ctk.CTkLabel(self, text="Steel Procurement List", font=ctk.CTkFont(size=24, weight="bold"))
         self.header.pack(pady=(20, 5))
         
-        self.sub = ctk.CTkLabel(self, text="Select Category -> Profile -> Enter Qty, Length & Scrap %", text_color="gray")
+        self.sub = ctk.CTkLabel(self, text="Linear = mm | Plates = feet", text_color="gray")
         self.sub.pack(pady=(0, 15))
         
         self.scroll_frame = ctk.CTkScrollableFrame(self)
@@ -153,25 +155,43 @@ class SteelApp(ctk.CTk):
         
         current_profiles = PROFILE_DATA.get(cat_var.get(), ["--"])
         profile_var = ctk.StringVar(value=current_profiles[0])
-        profile_dropdown = ctk.CTkComboBox(row_frame, variable=profile_var, values=current_profiles, width=180)
+        profile_dropdown = ctk.CTkComboBox(row_frame, variable=profile_var, values=current_profiles, width=160)
         profile_dropdown.pack(side="left", padx=10)
         
-        def update_profiles(choice):
+        qty_entry = ctk.CTkEntry(row_frame, placeholder_text="Qty", width=50)
+        qty_entry.pack(side="left", padx=10)
+        
+        len_entry = ctk.CTkEntry(row_frame, placeholder_text="Len (mm)", width=70)
+        len_entry.pack(side="left", padx=10)
+
+        # Initialize without placeholder to avoid render bugs
+        wid_entry = ctk.CTkEntry(row_frame, width=70)
+        wid_entry.pack(side="left", padx=10)
+        
+        scrap_entry = ctk.CTkEntry(row_frame, placeholder_text="Scrap %", width=65)
+        scrap_entry.pack(side="left", padx=10)
+        
+        # DYNAMIC UI LOGIC
+        def update_ui_for_category(*args):
+            choice = cat_var.get()
             new_profiles = PROFILE_DATA.get(choice, ["--"])
             profile_dropdown.configure(values=new_profiles)
             profile_var.set(new_profiles[0])
             
-        cat_dropdown.configure(command=update_profiles)
-        
-        qty_entry = ctk.CTkEntry(row_frame, placeholder_text="Qty", width=70)
-        qty_entry.pack(side="left", padx=10)
-        
-        len_entry = ctk.CTkEntry(row_frame, placeholder_text="Len (m)", width=70)
-        len_entry.pack(side="left", padx=10)
-
-        # NEW: Scrap Percentage Entry
-        scrap_entry = ctk.CTkEntry(row_frame, placeholder_text="Scrap %", width=70)
-        scrap_entry.pack(side="left", padx=10)
+            if choice == "Plate" or choice == "Grating":
+                len_entry.configure(placeholder_text="Len (ft)")
+                wid_entry.configure(state="normal")
+                wid_entry.configure(placeholder_text="Wid (ft)")
+            else:
+                len_entry.configure(placeholder_text="Len (mm)")
+                # Temporarily enable to safely clear and update placeholder
+                wid_entry.configure(state="normal") 
+                wid_entry.delete(0, 'end')
+                wid_entry.configure(placeholder_text="--")
+                wid_entry.configure(state="disabled")
+                
+        cat_dropdown.configure(command=update_ui_for_category)
+        update_ui_for_category() # Run once to set initial state
         
         def remove_self():
             row_frame.destroy()
@@ -187,7 +207,8 @@ class SteelApp(ctk.CTk):
             "profile": profile_var,
             "qty": qty_entry,
             "length": len_entry,
-            "scrap": scrap_entry # Tracking the new input
+            "width": wid_entry,
+            "scrap": scrap_entry
         }
         self.rows.append(row_data)
 
@@ -202,47 +223,53 @@ class SteelApp(ctk.CTk):
             
         results = []
         grand_total_wt = 0.0
-        grand_total_scrap = 0.0 # NEW: Track total scrap
+        grand_total_scrap = 0.0 
         
         for idx, row in enumerate(self.rows):
             prof = row["profile"].get()
             qty_str = row["qty"].get()
             len_str = row["length"].get()
+            wid_str = row["width"].get()
             scrap_str = row["scrap"].get()
+            
+            is_plate = profile_details.get(prof, {}).get("cat") in ["Plate", "Grating"]
             
             if not qty_str or not len_str:
                 tkmb.showerror("Missing Data", f"Item {idx+1} is missing Quantity or Length.")
                 return
-            try:
-                qty = int(qty_str)
-                length = float(len_str)
-                # If scrap is left blank, default to 0.0
-                scrap_pct = float(scrap_str) if scrap_str else 0.0
-            except ValueError:
-                tkmb.showerror("Invalid Input", f"Item {idx+1} has invalid numbers. Use digits only.")
+            if is_plate and not wid_str:
+                tkmb.showerror("Missing Data", f"Item {idx+1} is a Plate and requires a Width.")
                 return
                 
             try:
-                # Call C++ Engine
-                order = bom_core.OrderItems(prof, qty, length)
+                qty = int(qty_str)
+                length = float(len_str)
+                width = float(wid_str) if is_plate else 0.0
+                scrap_pct = float(scrap_str) if scrap_str else 0.0
+            except ValueError:
+                tkmb.showerror("Invalid Input", f"Item {idx+1} has invalid numbers.")
+                return
+                
+            try:
+                # Send all 4 variables to the new C++ Engine!
+                order = bom_core.OrderItems(prof, qty, length, width)
                 res = calculator.calculate_item(order)
                 
-                dims = profile_details.get(prof, {"depth": "--", "width": "--"})
-                
-                # Calculate Scrap Weight (Percentage of the Commercial/Billed weight)
                 scrap_wt = res.commercial_weight_kg * (scrap_pct / 100.0)
+                tonnage = math.ceil((res.commercial_weight_kg / 1000.0) * 1000) / 1000.0
                 
                 results.append({
                     "sno": idx + 1,
                     "profile": prof,
-                    "depth": dims["depth"],
-                    "width": dims["width"],
                     "length": length,
+                    "width": width,
+                    "is_plate": is_plate,
                     "qty": qty,
                     "bars": res.standard_bars_to_order,
                     "scrap_pct": scrap_pct,
                     "scrap_wt": scrap_wt,
-                    "billed_wt": res.commercial_weight_kg
+                    "billed_wt": res.commercial_weight_kg,
+                    "tonnage": tonnage
                 })
                 
                 grand_total_wt += res.commercial_weight_kg
