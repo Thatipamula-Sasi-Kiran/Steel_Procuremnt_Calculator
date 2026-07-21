@@ -1,11 +1,13 @@
 import customtkinter as ctk
 import tkinter.messagebox as tkmb
+from tkinter import simpledialog, filedialog
+import tkinter as tk
 import csv
 import bom_core
 import os
 import sys
-import math
 
+# STREAMING_CHUNK:Configuring system paths and database...
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -22,7 +24,6 @@ else:
     print(f"CRITICAL ERROR: Database file not found at {CSV_PATH}")
 
 calculator = bom_core.BOMCalculator(db, 12.0)
-
 profile_details = {}
 
 def load_profiles():
@@ -37,239 +38,413 @@ def load_profiles():
             for row in reader:
                 if len(row) >= 5:
                     name = row[0].strip()
-                    
                     try:
                         weight = float(row[1].strip())
                     except ValueError:
                         weight = 0.0
-                        
                     cat = row[4].strip()
-                    
                     if cat not in categories:
                         categories[cat] = []
                     categories[cat].append(name)
-                    
-                    profile_details[name] = {
-                        "weight": weight,
-                        "depth": row[2].strip(),
-                        "width": row[3].strip(),
-                        "cat": cat
-                    }
+                    profile_details[name] = {"weight": weight, "cat": cat}
     except Exception as e:
         print(f"Error reading CSV: {e}")
         return {"Default": ["ISMB 100"]}
-        
     return categories
 
 PROFILE_DATA = load_profiles()
 CATEGORY_NAMES = list(PROFILE_DATA.keys())
 
-class MathWindow(ctk.CTkToplevel):
-    def __init__(self, parent, res):
+# STREAMING_CHUNK:Defining the Unreal Engine Blueprint Flowchart...
+class BlueprintMathWindow(ctk.CTkToplevel):
+    def __init__(self, parent, summary_item, drawing_sources):
         super().__init__(parent)
-        self.title(f"Math Audit: {res['profile']}")
-        self.geometry("600x580")
-        self.attributes("-topmost", True) 
+        self.title(f"Blueprint Math: {summary_item.profile_name}")
+        self.geometry("1400x700")  # Wider window for detailed nodes
+        self.attributes("-topmost", True)
         
-        header = ctk.CTkLabel(self, text="⚙️ C++ Engine Audit Trail", font=ctk.CTkFont(size=18, weight="bold"))
-        header.pack(pady=(15, 5))
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
         
-        self.container = ctk.CTkScrollableFrame(self, fg_color="#1e1e1e") 
-        self.container.pack(fill="both", expand=True, padx=20, pady=10)
+        self.canvas = tk.Canvas(self, bg="#1a1a1a", highlightthickness=0)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
         
-        # --- TOP TEXT (Parameters ONLY) ---
-        top_text = ""
-        if res['is_plate']:
-            top_text += f"INPUT PARAMETERS:\n"
-            top_text += f"-----------------\n"
-            top_text += f"Category   : Plate / Sheet\n"
-            top_text += f"Profile    : {res['profile']}\n"
-            top_text += f"Required   : {res['qty']} pieces\n"
-            top_text += f"Dimensions : {res['length']}' x {res['width']}'\n"
+        v_scroll = ctk.CTkScrollbar(self, orientation="vertical", command=self.canvas.yview)
+        v_scroll.grid(row=0, column=1, sticky="ns")
+        h_scroll = ctk.CTkScrollbar(self, orientation="horizontal", command=self.canvas.xview)
+        h_scroll.grid(row=1, column=0, sticky="ew")
+        
+        self.canvas.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+        
+        self.draw_grid()
+        
+        # Node setup - Widened for detailed math
+        node_width = 440
+        x_spacing = 520 
+        y_spacing = 180
+        
+        col0_x = 50
+        col1_x = col0_x + x_spacing
+        col2_x = col1_x + x_spacing
+        col3_x = col2_x + x_spacing
+        
+        total_sources = len(drawing_sources)
+        center_y = max(300, (total_sources * y_spacing) / 2)
+        
+        source_out_pins = []
+        
+        # --- Column 0: Source Nodes (The Drawings) ---
+        for i, src in enumerate(drawing_sources):
+            y_pos = 50 + (i * y_spacing)
+            if src.is_plate:
+                area_per_piece = (src.length_mm * src.width_mm) / 1000000.0
+                props = [
+                    ("Inputs", f"{src.quantity} pieces at {src.length_mm:.0f}x{src.width_mm:.0f} mm"),
+                    ("Step 1", f"Area per piece: ({src.length_mm:.0f} × {src.width_mm:.0f}) ÷ 1,000,000 = {area_per_piece:.4f} m²"),
+                    ("Step 2", f"Total Area: {area_per_piece:.4f} m² × {src.quantity} pieces = {src.exact_total_length_or_area:.4f} m²")
+                ]
+            else:
+                len_m = src.length_mm / 1000.0
+                props = [
+                    ("Inputs", f"{src.quantity} pieces at {src.length_mm:.0f} mm"),
+                    ("Step 1", f"Convert Length: {src.length_mm:.0f} mm ÷ 1000 = {len_m:.2f} meters"),
+                    ("Step 2", f"Total Length: {len_m:.2f} m × {src.quantity} pieces = {src.exact_total_length_or_area:.2f} meters")
+                ]
+                
+            _, outs = self.draw_node(
+                x=col0_x, y=y_pos, width=node_width,
+                title=f"◆ Extract Drawing ({src.drawing_name})", header_color="#8b0000",
+                in_pins=[], out_pins=["Data Out \u25B6"], properties=props
+            )
+            source_out_pins.append(outs["Data Out \u25B6"])
+            
+        # --- Column 1: Aggregator Node (The Convergence) ---
+        agg_in_pins = [f"Item {i+1} \u25B6" for i in range(total_sources)]
+        
+        math_str = " + ".join([f"{src.exact_total_length_or_area:.2f}" if not src.is_plate else f"{src.exact_total_length_or_area:.4f}" for src in drawing_sources])
+        unit = "meters" if not summary_item.is_plate else "m²"
+        
+        agg_props = [
+            ("Action", "Gathering all cuts from drawings above..."),
+            ("Math", f"{math_str} = {summary_item.grand_total_length_or_area:.4f} {unit}"),
+            ("Result", f"Grand Total Needed = {summary_item.grand_total_length_or_area:.4f} {unit}")
+        ]
+        
+        agg_ins, agg_outs = self.draw_node(
+            x=col1_x, y=center_y - 80, width=node_width,
+            title="ƒ Aggregate Data", header_color="#27ae60",
+            in_pins=agg_in_pins, out_pins=["Total \u25B6"], properties=agg_props
+        )
+        
+        # --- Column 2: Strategy Node (Procurement Logic) ---
+        if summary_item.is_plate:
+            sheet_area = 1.25 * 2.50 if "1250" in summary_item.recommended_plate_size else 1.50 * 6.30
+            raw_sheets = summary_item.grand_total_length_or_area / sheet_area
+            
+            strat_props = [
+                ("Rule", "Testing standard sheet sizes to find lowest scrap."),
+                ("Winner", f"{summary_item.recommended_plate_size} is the most efficient."),
+                ("Math", f"Area of 1 winner sheet = {sheet_area:.4f} m²"),
+                ("Math", f"{summary_item.grand_total_length_or_area:.4f} m² ÷ {sheet_area:.4f} m² = {raw_sheets:.2f} sheets"),
+                ("Rule", "Rounding up to nearest full sheet."),
+                ("Result", f"We must order {summary_item.standard_bars_to_order} full sheets.")
+            ]
         else:
-            top_text += f"INPUT PARAMETERS:\n"
-            top_text += f"-----------------\n"
-            top_text += f"Category   : Linear (Beam/Pipe/Angle/etc)\n"
-            top_text += f"Profile    : {res['profile']}\n"
-            top_text += f"Required   : {res['qty']} pieces\n"
-            top_text += f"Dimensions : {res['length']} mm per piece\n"
-
-        self.top_lbl = ctk.CTkLabel(self.container, text=top_text, justify="left", font=ctk.CTkFont("Consolas", 13))
-        self.top_lbl.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        # --- INTERACTIVE EXPANDER BUTTON ---
-        self.is_expanded = False
-        self.toggle_btn = ctk.CTkButton(self.container, text="▶ Show Weight Calculation Breakdown", 
-                                        fg_color="#333333", hover_color="#444444", anchor="w",
-                                        command=self.toggle_breakdown)
-        self.toggle_btn.pack(fill="x", padx=10, pady=5)
-        
-        # --- EXPANDABLE BREAKDOWN FRAME (Chronological Story) ---
-        self.breakdown_frame = ctk.CTkFrame(self.container, fg_color="#2a2d2e")
-        breakdown_text = ""
-        wt = res['unit_wt']
-        
-        if res['is_plate']:
-            area_sqft = res['length'] * res['width']
-            area_sqm = area_sqft * 0.092903
+            raw_bars = summary_item.grand_total_length_or_area / 12.0
+            strat_props = [
+                ("Rule", "We must buy full 12.0 meter bars from the market."),
+                ("Math", f"{summary_item.grand_total_length_or_area:.2f} meters needed ÷ 12.0 m = {raw_bars:.2f} bars"),
+                ("Rule", "You cannot buy a fraction of a bar. Rounding up."),
+                ("Result", f"We must order {summary_item.standard_bars_to_order} full bars.")
+            ]
             
-            breakdown_text += f" STEP 1: EXACT MATERIAL NEED (BASE WEIGHT)\n"
-            breakdown_text += f" -----------------------------------------\n"
-            breakdown_text += f" Unit Weight  = {wt:.2f} kg/m²\n"
-            breakdown_text += f" Piece Area   = {res['length']}' x {res['width']}' = {area_sqft:.2f} sq.ft\n"
-            breakdown_text += f" Area in m²   = {area_sqft:.2f} sq.ft * 0.092903 = {area_sqm:.4f} m²\n"
-            breakdown_text += f" Base Weight  = {res['qty']} pieces * {area_sqm:.4f} m² * {wt:.2f} kg/m²\n"
-            breakdown_text += f"              = {res['base_wt']:.2f} kg\n\n"
-            
-            breakdown_text += f" STEP 2: COMMERCIAL ORDER (BILLED WEIGHT)\n"
-            breakdown_text += f" ----------------------------------------\n"
-            breakdown_text += f" Standard Sheet = 8 ft x 4 ft (32 sq.ft = 2.9729 m²)\n"
-            breakdown_text += f" Nesting Engine = Fitted {res['qty']} pieces into {res['bars']} standard sheets\n"
-            breakdown_text += f" Billed Weight  = {res['bars']} sheets * 2.9729 m² * {wt:.2f} kg/m²\n"
-            breakdown_text += f"                = {res['billed_wt']:.2f} kg\n"
+        strat_ins, strat_outs = self.draw_node(
+            x=col2_x, y=center_y - 80, width=node_width,
+            title="➔ Exec Strategy", header_color="#2980b9",
+            in_pins=["Total In \u25B6"], out_pins=["Order Data \u25B6"], properties=strat_props
+        )
+        
+        # --- Column 3: Final Output Node (The Billing) ---
+        if summary_item.is_plate:
+             final_props = [
+                ("Fact", f"This plate weighs {summary_item.unit_weight:.2f} kg per m²."),
+                ("Math", f"{summary_item.standard_bars_to_order} sheets × {sheet_area:.4f} m² × {summary_item.unit_weight:.2f} kg/m² = {summary_item.commercial_weight_kg:.2f} kg"),
+                ("Math", f"{summary_item.commercial_weight_kg:.2f} kg ÷ 1000 = {summary_item.tonnage_mt:.3f} Metric Tons (MT)")
+            ]
         else:
-            total_m = (res['length'] / 1000.0) * res['qty']
-            comm_m = res['bars'] * 12.0
+            final_props = [
+                ("Fact", f"A 12.0m bar weighs {summary_item.unit_weight:.2f} kg per meter."),
+                ("Math", f"{summary_item.standard_bars_to_order} bars × 12.0 m × {summary_item.unit_weight:.2f} kg/m = {summary_item.commercial_weight_kg:.2f} kg"),
+                ("Math", f"{summary_item.commercial_weight_kg:.2f} kg ÷ 1000 = {summary_item.tonnage_mt:.3f} Metric Tons (MT)")
+            ]
             
-            breakdown_text += f" STEP 1: EXACT MATERIAL NEED (BASE WEIGHT)\n"
-            breakdown_text += f" -----------------------------------------\n"
-            breakdown_text += f" Unit Weight  = {wt:.2f} kg/m\n"
-            breakdown_text += f" Total Length = {res['qty']} pieces * {res['length']:.0f} mm = {total_m:.2f} m\n"
-            breakdown_text += f" Base Weight  = {total_m:.2f} m * {wt:.2f} kg/m\n"
-            breakdown_text += f"              = {res['base_wt']:.2f} kg\n\n"
-            
-            breakdown_text += f" STEP 2: COMMERCIAL ORDER (BILLED WEIGHT)\n"
-            breakdown_text += f" ----------------------------------------\n"
-            breakdown_text += f" Standard Bar  = 12.0 meters\n"
-            breakdown_text += f" Bars Required = Ceiling({total_m:.2f} m / 12.0 m) = {res['bars']} bars\n"
-            breakdown_text += f" Billed Length = {res['bars']} bars * 12.0 m = {comm_m:.2f} m\n"
-            breakdown_text += f" Billed Weight = {comm_m:.2f} m * {wt:.2f} kg/m\n"
-            breakdown_text += f"               = {res['billed_wt']:.2f} kg\n"
-            
-        self.breakdown_lbl = ctk.CTkLabel(self.breakdown_frame, text=breakdown_text, justify="left", 
-                                          font=ctk.CTkFont("Consolas", 12), text_color="#a8c7fa")
-        self.breakdown_lbl.pack(anchor="w", padx=15, pady=10)
+        final_ins, _ = self.draw_node(
+            x=col3_x, y=center_y - 80, width=node_width,
+            title="⛁ Final Order", header_color="#404040",
+            in_pins=["Order Data \u25B6"], out_pins=[], properties=final_props
+        )
         
-        # --- BOTTOM TEXT (Financial) ---
-        bottom_text = f"\nFINANCIAL / REPORTING:\n"
-        bottom_text += f"----------------------\n"
-        bottom_text += f"User Scrap Rate     : {res['scrap_pct']} %\n"
-        bottom_text += f"Scrap Subtotal      : {res['scrap_wt']:.2f} kg\n"
-        bottom_text += f"Final Tonnage (MT)  : {res['tonnage']:.3f} MT\n"
-
-        self.bottom_lbl = ctk.CTkLabel(self.container, text=bottom_text, justify="left", font=ctk.CTkFont("Consolas", 13))
-        self.bottom_lbl.pack(anchor="w", padx=10, pady=(0, 10))
+        # Draw Spline Connections
+        for i, src_pin in enumerate(source_out_pins):
+            target_pin = agg_ins[agg_in_pins[i]]
+            self.draw_spline(src_pin, target_pin, color="#3498db")
+            
+        self.draw_spline(agg_outs["Total \u25B6"], strat_ins["Total In \u25B6"], color="#e67e22")
+        self.draw_spline(strat_outs["Order Data \u25B6"], final_ins["Order Data \u25B6"], color="#9b59b6")
         
-        close_btn = ctk.CTkButton(self, text="Close Window", command=self.destroy)
-        close_btn.pack(pady=(0, 15))
+        self.canvas.configure(scrollregion=(0, 0, col3_x + node_width + 100, max(700, (total_sources * y_spacing) + 100)))
 
-    def toggle_breakdown(self):
-        if self.is_expanded:
-            self.breakdown_frame.pack_forget()
-            self.bottom_lbl.pack_forget()
-            self.bottom_lbl.pack(anchor="w", padx=10, pady=(0, 10))
-            self.toggle_btn.configure(text="▶ Show Weight Calculation Breakdown")
-            self.is_expanded = False
-        else:
-            self.bottom_lbl.pack_forget()
-            self.breakdown_frame.pack(fill="x", padx=10, pady=5)
-            self.bottom_lbl.pack(anchor="w", padx=10, pady=(0, 10))
-            self.toggle_btn.configure(text="▼ Hide Weight Calculation Breakdown")
-            self.is_expanded = True
+# STREAMING_CHUNK:Implementing the node rendering and bezier splines...
+    def draw_grid(self):
+        for i in range(0, 4000, 20):
+            color = "#2a2a2a" if i % 100 == 0 else "#222222"
+            self.canvas.create_line(i, 0, i, 4000, fill=color)
+            self.canvas.create_line(0, i, 4000, i, fill=color)
+
+    def draw_node(self, x, y, width, title, header_color, properties, in_pins, out_pins):
+        header_h = 30
+        row_h = 24
+        
+        pins_rows = max(len(in_pins), len(out_pins))
+        prop_rows = len(properties)
+        
+        body_h = ((pins_rows + prop_rows) * row_h) + 20
+        if pins_rows > 0 and prop_rows > 0:
+            body_h += 10 # Extra visual gap between pins and properties
+        if body_h < 50: body_h = 50
+        
+        self.canvas.create_rectangle(x+3, y+3, x+width+3, y+header_h+body_h+3, fill="#000000", outline="")
+        self.canvas.create_rectangle(x, y, x+width, y+header_h+body_h, fill="#1c1c1e", outline="#000000", width=2)
+        self.canvas.create_rectangle(x, y, x+width, y+header_h, fill=header_color, outline="#000000", width=2)
+        self.canvas.create_text(x+10, y+15, text=title, fill="#ffffff", font=("Segoe UI", 10, "bold"), anchor="w")
+        
+        in_coords, out_coords = {}, {}
+        pin_radius = 5
+        current_y = y + header_h + 15
+        
+        # Draw Pins First
+        for i in range(pins_rows):
+            if i < len(in_pins):
+                pin_name = in_pins[i]
+                self.canvas.create_oval(x-pin_radius, current_y-pin_radius, x+pin_radius, current_y+pin_radius, fill="#00a8ff", outline="#000000", width=1.5)
+                self.canvas.create_text(x+15, current_y, text=pin_name, fill="#ffffff", font=("Segoe UI", 8), anchor="w")
+                in_coords[pin_name] = (x, current_y)
+
+            if i < len(out_pins):
+                pin_name = out_pins[i]
+                self.canvas.create_oval(x+width-pin_radius, current_y-pin_radius, x+width+pin_radius, current_y+pin_radius, fill="#00a8ff", outline="#000000", width=1.5)
+                self.canvas.create_text(x+width-15, current_y, text=pin_name, fill="#ffffff", font=("Segoe UI", 8), anchor="e")
+                out_coords[pin_name] = (x+width, current_y)
+                
+            current_y += row_h
+
+        if pins_rows > 0 and prop_rows > 0:
+            current_y += 10 # Drop down safely below pins
+            
+        # Draw Properties (Left Aligned for readability of formulas)
+        for p_name, p_val in properties:
+            self.canvas.create_text(x+10, current_y, text=f"{p_name}: ", fill="#aaaaaa", font=("Segoe UI", 9, "bold"), anchor="w")
+            # Calculate width of the label to offset the value text
+            label_w = self.canvas.bbox(self.canvas.create_text(0, 0, text=f"{p_name}: ", font=("Segoe UI", 9, "bold")))[2]
+            self.canvas.create_text(x+10+label_w, current_y, text=f"{p_val}", fill="#e2e8f0", font=("Consolas", 9), anchor="w")
+            current_y += row_h
+
+        return in_coords, out_coords
+
+    def draw_spline(self, start_pt, end_pt, color):
+        x1, y1 = start_pt
+        x2, y2 = end_pt
+        dist = abs(x2 - x1)
+        cx1 = x1 + (dist * 0.5)
+        cy1 = y1
+        cx2 = x2 - (dist * 0.5)
+        cy2 = y2
+        self.canvas.create_line(x1, y1, cx1, cy1, cx2, cy2, x2, y2, smooth=True, fill="#000000", width=4)
+        self.canvas.create_line(x1, y1, cx1, cy1, cx2, cy2, x2, y2, smooth=True, fill=color, width=2)
 
 
+# STREAMING_CHUNK:Building the Multi-Tabbed Report Window and Exporter...
 class ReportWindow(ctk.CTkToplevel):
-    def __init__(self, parent, results, grand_total_wt, grand_total_scrap):
+    def __init__(self, parent, project_result):
         super().__init__(parent)
-        self.title("Bill of Materials - Report")
-        self.geometry("1300x500") 
+        self.title("Consolidated Project Bill of Materials")
+        self.geometry("1150x650") 
+        
+        self.project_result = project_result
+        self.drawings_dict = {}
+        for item in project_result.drawing_items:
+            if item.drawing_name not in self.drawings_dict:
+                self.drawings_dict[item.drawing_name] = []
+            self.drawings_dict[item.drawing_name].append(item)
         
         title = ctk.CTkLabel(self, text="Project Bill of Materials", font=ctk.CTkFont(size=22, weight="bold"))
         title.pack(pady=(15, 10))
         
-        self.table_frame = ctk.CTkScrollableFrame(self, width=1250, height=300)
-        self.table_frame.pack(padx=20, pady=10, fill="both", expand=True)
+        self.tabs = ctk.CTkTabview(self)
+        self.tabs.pack(fill="both", expand=True, padx=20, pady=10)
         
-        headers = ["S.No", "Item Profile", "Dimensions", "Quantity", "Bars/Sheets", "Scrap (%)", "Scrap (kg)", "Billed Weight", "Tonnage (MT)", "Audit"]
+        summary_tab = self.tabs.add("Consolidated Summary")
+        self.build_summary_tab(summary_tab, project_result.summary_items, project_result.grand_total_tonnage)
+            
+        for d_name, items in self.drawings_dict.items():
+            d_tab = self.tabs.add(d_name)
+            self.build_drawing_tab(d_tab, items)
+            
+        export_btn = ctk.CTkButton(self, text="💾 Export to Excel (CSV)", fg_color="#1f6b40", hover_color="#288752", 
+                                   font=ctk.CTkFont(weight="bold"), command=self.export_to_csv)
+        export_btn.pack(pady=(0, 15))
+
+    def build_summary_tab(self, parent, summary_items, total_mt):
+        scroll = ctk.CTkScrollableFrame(parent)
+        scroll.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        headers = ["Material", "Recommended Size", "Bars/Sheets to Order", "Billed Wt (kg)", "Tonnage (MT)", "Audit Trail"]
         for col_idx, header in enumerate(headers):
-            lbl = ctk.CTkLabel(self.table_frame, text=header, font=ctk.CTkFont(weight="bold"))
-            lbl.grid(row=0, column=col_idx, padx=10, pady=5, sticky="w")
+            lbl = ctk.CTkLabel(scroll, text=header, font=ctk.CTkFont(weight="bold"))
+            lbl.grid(row=0, column=col_idx, padx=15, pady=5, sticky="w")
             
-        separator = ctk.CTkFrame(self.table_frame, height=2, fg_color="gray")
-        separator.grid(row=1, column=0, columnspan=len(headers), sticky="ew", pady=5)
+        for row_idx, res in enumerate(summary_items, start=1):
+            ctk.CTkLabel(scroll, text=res.profile_name, font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=0, padx=15, pady=8, sticky="w")
+            ctk.CTkLabel(scroll, text=res.recommended_plate_size).grid(row=row_idx, column=1, padx=15, pady=8, sticky="w")
+            ctk.CTkLabel(scroll, text=str(res.standard_bars_to_order)).grid(row=row_idx, column=2, padx=15, pady=8, sticky="w")
+            ctk.CTkLabel(scroll, text=f"{res.commercial_weight_kg:.2f} kg").grid(row=row_idx, column=3, padx=15, pady=8, sticky="w")
+            ctk.CTkLabel(scroll, text=f"{res.tonnage_mt:.3f} MT", text_color="#5cb85c", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=4, padx=15, pady=8, sticky="w")
+            
+            profile_drawings = [d for d in self.project_result.drawing_items if d.profile_name == res.profile_name]
+            btn = ctk.CTkButton(scroll, text="🔀 Blueprint Math", width=120, fg_color="#3b82f6", hover_color="#2563eb", 
+                                command=lambda r=res, sources=profile_drawings: BlueprintMathWindow(self, r, sources))
+            btn.grid(row=row_idx, column=5, padx=15, pady=8)
+
+        total_frame = ctk.CTkFrame(parent)
+        total_frame.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(total_frame, text=f"PROJECT GRAND TOTAL: {total_mt:.3f} MT", font=ctk.CTkFont(size=18, weight="bold"), text_color="#28a745").pack(side="right", padx=20, pady=10)
+
+    def build_drawing_tab(self, parent, drawing_items):
+        scroll = ctk.CTkScrollableFrame(parent)
+        scroll.pack(fill="both", expand=True, padx=10, pady=10)
         
-        for row_idx, res in enumerate(results, start=2):
-            ctk.CTkLabel(self.table_frame, text=str(res['sno'])).grid(row=row_idx, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=res['profile']).grid(row=row_idx, column=1, padx=10, pady=5, sticky="w")
+        headers = ["Material", "Thk", "Width (mm)", "Length (mm)", "Qty", "Total Len/Area", "Raw Cut Wt (kg)"]
+        for col_idx, header in enumerate(headers):
+            lbl = ctk.CTkLabel(scroll, text=header, font=ctk.CTkFont(weight="bold"))
+            lbl.grid(row=0, column=col_idx, padx=15, pady=5, sticky="w")
             
-            dim_text = f"{res['length']:.0f} mm" if not res['is_plate'] else f"{res['length']}' x {res['width']}' ft"
-            ctk.CTkLabel(self.table_frame, text=dim_text).grid(row=row_idx, column=2, padx=10, pady=5, sticky="w")
+        for row_idx, res in enumerate(drawing_items, start=1):
+            ctk.CTkLabel(scroll, text=res.profile_name).grid(row=row_idx, column=0, padx=15, pady=5, sticky="w")
+            ctk.CTkLabel(scroll, text="-").grid(row=row_idx, column=1, padx=15, pady=5, sticky="w") 
+            w_text = f"{res.width_mm:.0f}" if res.is_plate else "-"
+            ctk.CTkLabel(scroll, text=w_text).grid(row=row_idx, column=2, padx=15, pady=5, sticky="w")
+            ctk.CTkLabel(scroll, text=f"{res.length_mm:.0f}").grid(row=row_idx, column=3, padx=15, pady=5, sticky="w")
+            ctk.CTkLabel(scroll, text=str(res.quantity)).grid(row=row_idx, column=4, padx=15, pady=5, sticky="w")
             
-            ctk.CTkLabel(self.table_frame, text=str(res['qty'])).grid(row=row_idx, column=3, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=str(res['bars'])).grid(row=row_idx, column=4, padx=10, pady=5, sticky="w")
-            
-            ctk.CTkLabel(self.table_frame, text=f"{res['scrap_pct']} %", text_color="#f0ad4e").grid(row=row_idx, column=5, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=f"{res['scrap_wt']:.2f} kg", text_color="#f0ad4e", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=6, padx=10, pady=5, sticky="w")
-            
-            ctk.CTkLabel(self.table_frame, text=f"{res['billed_wt']:.2f} kg", text_color="#3a7ebf", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=7, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.table_frame, text=f"{res['tonnage']:.3f} MT", text_color="#5cb85c", font=ctk.CTkFont(weight="bold")).grid(row=row_idx, column=8, padx=10, pady=5, sticky="w")
-            
-            btn = ctk.CTkButton(self.table_frame, text="🔍 Show Math", width=100, fg_color="#333333", hover_color="#444444", 
-                                command=lambda r=res: self.open_audit(r))
-            btn.grid(row=row_idx, column=9, padx=10, pady=5)
+            amt_text = f"{res.exact_total_length_or_area:.4f} m²" if res.is_plate else f"{res.exact_total_length_or_area:.2f} m"
+            ctk.CTkLabel(scroll, text=amt_text).grid(row=row_idx, column=5, padx=15, pady=5, sticky="w")
+            ctk.CTkLabel(scroll, text=f"{res.exact_weight_kg:.2f} kg").grid(row=row_idx, column=6, padx=15, pady=5, sticky="w")
 
-        total_frame = ctk.CTkFrame(self)
-        total_frame.pack(fill="x", padx=20, pady=15)
-        
-        grand_tonnage = math.ceil((grand_total_wt / 1000.0) * 1000.0) / 1000.0
-        
-        scrap_lbl = ctk.CTkLabel(total_frame, text=f"TOTAL SCRAP: {grand_total_scrap:.2f} kg", font=ctk.CTkFont(size=16, weight="bold"), text_color="#f0ad4e")
-        scrap_lbl.pack(side="left", padx=20, pady=10)
+    def export_to_csv(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("Excel CSV", "*.csv")], title="Save Project BOM")
+        if not file_path: return
+        try:
+            with open(file_path, mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                
+                # Write Individual Drawings
+                for d_name, items in self.drawings_dict.items():
+                    writer.writerow([f"--- DRAWING: {d_name.upper()} ---"])
+                    writer.writerow(["Material", "Thk", "Width (mm)", "Length (mm)", "Qty", "Total Len/Area", "Raw Cut Wt (kg)"])
+                    for res in items:
+                        w_text = f"{res.width_mm:.0f}" if res.is_plate else "-"
+                        amt_text = f"{res.exact_total_length_or_area:.4f} m²" if res.is_plate else f"{res.exact_total_length_or_area:.2f} m"
+                        writer.writerow([res.profile_name, "-", w_text, f"{res.length_mm:.0f}", res.quantity, amt_text, round(res.exact_weight_kg, 2)])
+                    writer.writerow([]) # Empty row for spacing
+                    
+                # Write Summary
+                writer.writerow(["--- CONSOLIDATED PROCUREMENT SUMMARY ---"])
+                writer.writerow(["Material", "Recommended Size", "Bars/Sheets to Order", "Billed Wt (kg)", "Tonnage (MT)"])
+                for res in self.project_result.summary_items:
+                    writer.writerow([res.profile_name, res.recommended_plate_size, res.standard_bars_to_order, round(res.commercial_weight_kg, 2), round(res.tonnage_mt, 3)])
+                    
+                writer.writerow([])
+                writer.writerow(["", "", "", "PROJECT GRAND TOTAL (MT):", round(self.project_result.grand_total_tonnage, 3)])
+                
+            tkmb.showinfo("Export Successful", f"BOM successfully saved to:\n{file_path}")
+        except Exception as e:
+            tkmb.showerror("Export Error", f"Failed to save file:\n{e}")
 
-        grand_lbl = ctk.CTkLabel(total_frame, text=f"GRAND TOTAL: {grand_total_wt:.2f} kg  ({grand_tonnage:.3f} MT)", font=ctk.CTkFont(size=18, weight="bold"), text_color="#28a745")
-        grand_lbl.pack(side="right", padx=20, pady=10)
-
-    def open_audit(self, res_data):
-        MathWindow(self, res_data)
-
-
+# STREAMING_CHUNK:Building the Multi-Tiered Tabbed App...
 class SteelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        self.title("Steel BOM Calculator")
-        self.geometry("1080x600") 
+        self.title("Steel BOM Project Manager")
+        self.geometry("1100x650") 
         ctk.set_appearance_mode("Dark")
         ctk.set_default_color_theme("blue")
         
-        self.rows = [] 
+        self.drawings = {}
         
-        self.header = ctk.CTkLabel(self, text="Steel Procurement List", font=ctk.CTkFont(size=24, weight="bold"))
+        self.header = ctk.CTkLabel(self, text="Multi-Tiered Procurement System", font=ctk.CTkFont(size=24, weight="bold"))
         self.header.pack(pady=(20, 5))
         
-        self.sub = ctk.CTkLabel(self, text="Linear items are measured in Millimeters (mm). Plates are measured in Feet (ft).", text_color="gray")
-        self.sub.pack(pady=(0, 15))
+        self.sub = ctk.CTkLabel(self, text="All measurements (Length & Width) must be strictly in Millimeters (mm).", text_color="gray")
+        self.sub.pack(pady=(0, 10))
         
-        self.scroll_frame = ctk.CTkScrollableFrame(self)
-        self.scroll_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        ctrl_frame = ctk.CTkFrame(self, fg_color="transparent")
+        ctrl_frame.pack(fill="x", padx=20)
+        
+        ctk.CTkButton(ctrl_frame, text="+ Add Drawing", command=self.add_drawing_tab, width=120).pack(side="left", padx=5)
+        ctk.CTkButton(ctrl_frame, text="✏️ Rename Current", command=self.rename_current_tab, width=120, fg_color="#555555").pack(side="left", padx=5)
+        
+        self.tabs = ctk.CTkTabview(self)
+        self.tabs.pack(fill="both", expand=True, padx=20, pady=10)
         
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.btn_frame.pack(fill="x", padx=20, pady=15)
         
-        self.add_btn = ctk.CTkButton(self.btn_frame, text="+ Add Item", command=self.add_item_row, fg_color="#444444", hover_color="#555555")
-        self.add_btn.pack(side="left", padx=10)
-        
-        self.calc_btn = ctk.CTkButton(self.btn_frame, text="Generate BOM Receipt", command=self.calculate_all, height=40, font=ctk.CTkFont(weight="bold"))
+        self.calc_btn = ctk.CTkButton(self.btn_frame, text="Generate Project BOM", command=self.calculate_all, height=45, font=ctk.CTkFont(size=16, weight="bold"), fg_color="#10b981", hover_color="#059669")
         self.calc_btn.pack(side="right", padx=10)
         
-        self.add_item_row()
+        self.add_drawing_tab("Drawing 1")
 
-    def add_item_row(self):
-        row_data = {}
-        row_frame = ctk.CTkFrame(self.scroll_frame)
+    def add_drawing_tab(self, name=None):
+        if not name:
+            name = simpledialog.askstring("New Drawing", "Enter Drawing Name:")
+            if not name:
+                return
+                
+        if name in self.drawings:
+            tkmb.showerror("Error", "A drawing with that name already exists.")
+            return
+            
+        tab_frame = self.tabs.add(name)
+        self.tabs.set(name)
+        
+        scroll_frame = ctk.CTkScrollableFrame(tab_frame)
+        scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        add_btn = ctk.CTkButton(tab_frame, text="+ Add Item to " + name, command=lambda d=name: self.add_item_row(d), fg_color="#444444", hover_color="#555555")
+        add_btn.pack(pady=10)
+        
+        self.drawings[name] = {"scroll": scroll_frame, "rows": []}
+        self.add_item_row(name)
+
+    def rename_current_tab(self):
+        old_name = self.tabs.get()
+        new_name = simpledialog.askstring("Rename Drawing", "Enter New Drawing Name:", initialvalue=old_name)
+        if not new_name or new_name == old_name:
+            return
+            
+        if new_name in self.drawings:
+            tkmb.showerror("Error", "A drawing with that name already exists.")
+            return
+            
+        tkmb.showinfo("Info", "Tab renaming requires a UI rebuild. Feature coming soon. Please create a new tab for now!")
+
+    def add_item_row(self, drawing_name):
+        d_data = self.drawings[drawing_name]
+        row_frame = ctk.CTkFrame(d_data["scroll"])
         row_frame.pack(fill="x", pady=5)
         
-        sno_lbl = ctk.CTkLabel(row_frame, text=f"{len(self.rows) + 1}.")
+        sno_lbl = ctk.CTkLabel(row_frame, text=f"{len(d_data['rows']) + 1}.")
         sno_lbl.pack(side="left", padx=10)
         
         cat_var = ctk.StringVar(value=CATEGORY_NAMES[0] if CATEGORY_NAMES else "")
@@ -290,9 +465,6 @@ class SteelApp(ctk.CTk):
         wid_entry = ctk.CTkEntry(row_frame, width=100)
         wid_entry.pack(side="left", padx=10)
         
-        scrap_entry = ctk.CTkEntry(row_frame, placeholder_text="Scrap (%)", width=85)
-        scrap_entry.pack(side="left", padx=10)
-        
         def update_ui_for_category(*args):
             choice = cat_var.get()
             new_profiles = PROFILE_DATA.get(choice, ["--"])
@@ -300,27 +472,17 @@ class SteelApp(ctk.CTk):
             profile_var.set(new_profiles[0])
             
             if choice == "Plate" or choice == "Grating":
-                len_entry.configure(placeholder_text="Length (ft)")
                 wid_entry.configure(state="normal")
                 wid_entry.delete(0, 'end')
-                wid_entry.configure(placeholder_text="Width (ft)")
+                wid_entry.configure(placeholder_text="Width (mm)")
             else:
-                len_entry.configure(placeholder_text="Length (mm)")
                 wid_entry.configure(state="normal") 
                 wid_entry.delete(0, 'end')
-                wid_entry.configure(placeholder_text="--")
+                wid_entry.configure(placeholder_text="-")
                 wid_entry.configure(state="disabled")
                 
         cat_dropdown.configure(command=update_ui_for_category)
         update_ui_for_category() 
-        
-        def remove_self():
-            row_frame.destroy()
-            self.rows.remove(row_data)
-            self.update_serial_numbers()
-            
-        remove_btn = ctk.CTkButton(row_frame, text="X", width=30, fg_color="#d9534f", hover_color="#c9302c", command=remove_self)
-        remove_btn.pack(side="right", padx=10)
         
         row_data = {
             "frame": row_frame,
@@ -328,82 +490,62 @@ class SteelApp(ctk.CTk):
             "profile": profile_var,
             "qty": qty_entry,
             "length": len_entry,
-            "width": wid_entry,
-            "scrap": scrap_entry
+            "width": wid_entry
         }
-        self.rows.append(row_data)
-
-    def update_serial_numbers(self):
-        for idx, row in enumerate(self.rows):
-            row["sno_lbl"].configure(text=f"{idx + 1}.")
+        
+        def remove_self():
+            row_frame.destroy()
+            d_data["rows"].remove(row_data)
+            for idx, r in enumerate(d_data["rows"]):
+                r["sno_lbl"].configure(text=f"{idx + 1}.")
+            
+        remove_btn = ctk.CTkButton(row_frame, text="X", width=30, fg_color="#ef4444", hover_color="#dc2626", command=remove_self)
+        remove_btn.pack(side="right", padx=10)
+        
+        d_data["rows"].append(row_data)
 
     def calculate_all(self):
-        if not self.rows:
-            tkmb.showwarning("Empty List", "Please add at least one item.")
-            return
-            
-        results = []
-        grand_total_wt = 0.0
-        grand_total_scrap = 0.0 
+        project_items = []
         
-        for idx, row in enumerate(self.rows):
-            prof = row["profile"].get()
-            qty_str = row["qty"].get()
-            len_str = row["length"].get()
-            wid_str = row["width"].get()
-            scrap_str = row["scrap"].get()
-            
-            is_plate = profile_details.get(prof, {}).get("cat") in ["Plate", "Grating"]
-            
-            if not qty_str or not len_str:
-                tkmb.showerror("Missing Data", f"Item {idx+1} is missing Quantity or Length.")
-                return
-            if is_plate and not wid_str:
-                tkmb.showerror("Missing Data", f"Item {idx+1} is a Plate and requires a Width.")
-                return
+        for d_name, d_data in self.drawings.items():
+            for idx, row in enumerate(d_data["rows"]):
+                prof = row["profile"].get()
+                qty_str = row["qty"].get()
+                len_str = row["length"].get()
+                wid_str = row["width"].get()
                 
-            try:
-                qty = int(qty_str)
-                length = float(len_str)
-                width = float(wid_str) if is_plate else 0.0
-                scrap_pct = float(scrap_str) if scrap_str else 0.0
-            except ValueError:
-                tkmb.showerror("Invalid Input", f"Item {idx+1} has invalid numbers. Use digits only.")
-                return
+                if not qty_str and not len_str:
+                    continue
+                    
+                is_plate = profile_details.get(prof, {}).get("cat") in ["Plate", "Grating"]
                 
-            try:
-                order = bom_core.OrderItems(prof, qty, length, width)
-                res = calculator.calculate_item(order)
+                if not qty_str or not len_str:
+                    tkmb.showerror("Missing Data", f"[{d_name}] Item {idx+1} is missing Quantity or Length.")
+                    return
+                if is_plate and not wid_str:
+                    tkmb.showerror("Missing Data", f"[{d_name}] Item {idx+1} is a Plate and requires a Width (mm).")
+                    return
+                    
+                try:
+                    qty = int(qty_str)
+                    length = float(len_str)
+                    width = float(wid_str) if is_plate else 0.0
+                except ValueError:
+                    tkmb.showerror("Invalid Input", f"[{d_name}] Item {idx+1} has invalid numbers.")
+                    return
+                    
+                order = bom_core.OrderItems(d_name, prof, qty, length, width)
+                project_items.append(order)
                 
-                unit_wt = profile_details.get(prof, {}).get("weight", 0.0)
-                
-                scrap_wt = res.commercial_weight_kg * (scrap_pct / 100.0)
-                tonnage = math.ceil((res.commercial_weight_kg / 1000.0) * 1000) / 1000.0
-                
-                results.append({
-                    "sno": idx + 1,
-                    "profile": prof,
-                    "length": length,
-                    "width": width,
-                    "is_plate": is_plate,
-                    "qty": qty,
-                    "bars": res.standard_bars_to_order,
-                    "scrap_pct": scrap_pct,
-                    "scrap_wt": scrap_wt,
-                    "unit_wt": unit_wt,          
-                    "base_wt": res.base_weight_kg,
-                    "billed_wt": res.commercial_weight_kg,
-                    "tonnage": tonnage
-                })
-                
-                grand_total_wt += res.commercial_weight_kg
-                grand_total_scrap += scrap_wt
-                
-            except Exception as e:
-                tkmb.showerror("Engine Error", f"Failed calculating item {idx+1}: {e}")
-                return
-                
-        ReportWindow(self, results, grand_total_wt, grand_total_scrap)
+        if not project_items:
+            tkmb.showwarning("Empty Project", "Please add at least one item with data.")
+            return
+
+        try:
+            project_result = calculator.calculate_project(project_items)
+            ReportWindow(self, project_result)
+        except Exception as e:
+            tkmb.showerror("C++ Engine Error", f"Fatal calculation error:\n{e}")
 
 if __name__ == "__main__":
     app = SteelApp()

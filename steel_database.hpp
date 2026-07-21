@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
+// Helper to remove whitespace from strings
 static inline void trim(std::string &s) {
     size_t start = s.find_first_not_of(" \t\r\n\xEF\xBB\xBF");
     if (start == std::string::npos) {
@@ -17,6 +18,7 @@ static inline void trim(std::string &s) {
     s.erase(s.find_last_not_of(" \t\r\n") + 1);
 }
 
+// Upgraded to hold Category so the Engine knows if it's a Plate
 struct SteelProfile {
     std::string name;
     double weight;
@@ -60,7 +62,6 @@ public:
         }
     }
 
-    // Now returns the full profile struct so we know if it's a Plate or not!
     SteelProfile get_profile(const std::string& profile_name) const {
         std::string search_name = profile_name;
         trim(search_name); 
@@ -71,5 +72,10 @@ public:
         }
         
         return {"Unknown", 0.0, "Unknown"}; 
+    }
+    
+    // Kept for backward compatibility just in case
+    double get_weight(const std::string& profile_name) const {
+        return get_profile(profile_name).weight;
     }
 };
