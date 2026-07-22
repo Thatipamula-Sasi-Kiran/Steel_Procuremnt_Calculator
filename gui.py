@@ -282,8 +282,8 @@ class ReportWindow(ctk.CTkToplevel):
             d_tab = self.tabs.add(d_name)
             self.build_drawing_tab(d_tab, items)
             
-        export_btn = ctk.CTkButton(self, text="💾 Export to Excel (CSV)", fg_color="#1f6b40", hover_color="#288752", 
-                                   font=ctk.CTkFont(weight="bold"), command=self.export_to_csv)
+        export_btn = ctk.CTkButton(self, text="💾 Export to Excel (.xlsx)", fg_color="#1f6b40", hover_color="#288752", 
+                                   font=ctk.CTkFont(weight="bold"), command=self.export_to_excel)
         export_btn.pack(pady=(0, 15))
 
     def build_summary_tab(self, parent, summary_items, total_mt):
@@ -332,35 +332,73 @@ class ReportWindow(ctk.CTkToplevel):
             ctk.CTkLabel(scroll, text=amt_text).grid(row=row_idx, column=5, padx=15, pady=5, sticky="w")
             ctk.CTkLabel(scroll, text=f"{res.exact_weight_kg:.2f} kg").grid(row=row_idx, column=6, padx=15, pady=5, sticky="w")
 
-    def export_to_csv(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("Excel CSV", "*.csv")], title="Save Project BOM")
-        if not file_path: return
+    def export_to_excel(self):
+        # Gracefully handle the import in case the user hasn't run 'pip install openpyxl' yet
         try:
-            with open(file_path, mode='w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill
+            from openpyxl.utils import get_column_letter
+        except ImportError:
+            tkmb.showerror("Missing Library", "The 'openpyxl' library is required for Excel export.\n\nPlease open your terminal and run:\npip install openpyxl")
+            return
+
+        file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel Workbook", "*.xlsx")], title="Save Project BOM")
+        if not file_path: return
+        
+        try:
+            wb = openpyxl.Workbook()
+            
+            # --- 1. Create the Consolidated Summary Sheet ---
+            ws_summary = wb.active
+            ws_summary.title = "Consolidated Summary"
+            
+            # Styling formats
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid") # Nice blue header
+            
+            summary_headers = ["Material", "Recommended Size", "Bars/Sheets to Order", "Billed Wt (kg)", "Tonnage (MT)"]
+            ws_summary.append(summary_headers)
+            
+            # Apply styling to headers and adjust column widths
+            for col_num, cell in enumerate(ws_summary[1], 1):
+                cell.font = header_font
+                cell.fill = header_fill
+                ws_summary.column_dimensions[get_column_letter(col_num)].width = 22
                 
-                # Write Individual Drawings
-                for d_name, items in self.drawings_dict.items():
-                    writer.writerow([f"--- DRAWING: {d_name.upper()} ---"])
-                    writer.writerow(["Material", "Thk", "Width (mm)", "Length (mm)", "Qty", "Total Len/Area", "Raw Cut Wt (kg)"])
-                    for res in items:
-                        w_text = f"{res.width_mm:.0f}" if res.is_plate else "-"
-                        amt_text = f"{res.exact_total_length_or_area:.4f} m²" if res.is_plate else f"{res.exact_total_length_or_area:.2f} m"
-                        writer.writerow([res.profile_name, "-", w_text, f"{res.length_mm:.0f}", res.quantity, amt_text, round(res.exact_weight_kg, 2)])
-                    writer.writerow([]) # Empty row for spacing
-                    
-                # Write Summary
-                writer.writerow(["--- CONSOLIDATED PROCUREMENT SUMMARY ---"])
-                writer.writerow(["Material", "Recommended Size", "Bars/Sheets to Order", "Billed Wt (kg)", "Tonnage (MT)"])
-                for res in self.project_result.summary_items:
-                    writer.writerow([res.profile_name, res.recommended_plate_size, res.standard_bars_to_order, round(res.commercial_weight_kg, 2), round(res.tonnage_mt, 3)])
-                    
-                writer.writerow([])
-                writer.writerow(["", "", "", "PROJECT GRAND TOTAL (MT):", round(self.project_result.grand_total_tonnage, 3)])
+            for res in self.project_result.summary_items:
+                ws_summary.append([res.profile_name, res.recommended_plate_size, res.standard_bars_to_order, round(res.commercial_weight_kg, 2), round(res.tonnage_mt, 3)])
                 
-            tkmb.showinfo("Export Successful", f"BOM successfully saved to:\n{file_path}")
+            # Add Grand Total at the bottom
+            ws_summary.append([])
+            ws_summary.append(["", "", "", "PROJECT GRAND TOTAL (MT):", round(self.project_result.grand_total_tonnage, 3)])
+            ws_summary.cell(row=ws_summary.max_row, column=4).font = Font(bold=True)
+            ws_summary.cell(row=ws_summary.max_row, column=5).font = Font(bold=True)
+            
+            # --- 2. Create Individual Sheets for Every Drawing ---
+            for d_name, items in self.drawings_dict.items():
+                # Sanitize drawing name so it doesn't break Excel tab naming rules (max 31 chars, no special chars)
+                safe_name = "".join([c for c in d_name if c not in r'/\*?[]'])[:31]
+                ws = wb.create_sheet(title=safe_name)
+                
+                draw_headers = ["Material", "Thk", "Width (mm)", "Length (mm)", "Qty", "Total Len/Area", "Raw Cut Wt (kg)"]
+                ws.append(draw_headers)
+                
+                for col_num, cell in enumerate(ws[1], 1):
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    ws.column_dimensions[get_column_letter(col_num)].width = 18
+                    
+                for res in items:
+                    w_text = f"{res.width_mm:.0f}" if res.is_plate else "-"
+                    amt_text = f"{res.exact_total_length_or_area:.4f} m²" if res.is_plate else f"{res.exact_total_length_or_area:.2f} m"
+                    ws.append([res.profile_name, "-", w_text, f"{res.length_mm:.0f}", res.quantity, amt_text, round(res.exact_weight_kg, 2)])
+            
+            # Save the workbook to disk
+            wb.save(file_path)
+            tkmb.showinfo("Export Successful", f"Excel Workbook successfully saved to:\n{file_path}")
+            
         except Exception as e:
-            tkmb.showerror("Export Error", f"Failed to save file:\n{e}")
+            tkmb.showerror("Export Error", f"Failed to save Excel file:\n{e}")
 
 class SteelApp(ctk.CTk):
     def __init__(self):
