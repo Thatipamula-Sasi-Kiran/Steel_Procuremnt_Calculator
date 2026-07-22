@@ -7,7 +7,6 @@ import bom_core
 import os
 import sys
 
-# STREAMING_CHUNK:Configuring system paths and database...
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -55,7 +54,6 @@ def load_profiles():
 PROFILE_DATA = load_profiles()
 CATEGORY_NAMES = list(PROFILE_DATA.keys())
 
-# STREAMING_CHUNK:Defining the Unreal Engine Blueprint Flowchart...
 class BlueprintMathWindow(ctk.CTkToplevel):
     def __init__(self, parent, summary_item, drawing_sources):
         super().__init__(parent)
@@ -79,8 +77,8 @@ class BlueprintMathWindow(ctk.CTkToplevel):
         self.draw_grid()
         
         # Node setup - Widened for detailed math
-        node_width = 440
-        x_spacing = 520 
+        node_width = 460
+        x_spacing = 540 
         y_spacing = 180
         
         col0_x = 50
@@ -99,16 +97,16 @@ class BlueprintMathWindow(ctk.CTkToplevel):
             if src.is_plate:
                 area_per_piece = (src.length_mm * src.width_mm) / 1000000.0
                 props = [
-                    ("Inputs", f"{src.quantity} pieces at {src.length_mm:.0f}x{src.width_mm:.0f} mm"),
-                    ("Step 1", f"Area per piece: ({src.length_mm:.0f} × {src.width_mm:.0f}) ÷ 1,000,000 = {area_per_piece:.4f} m²"),
-                    ("Step 2", f"Total Area: {area_per_piece:.4f} m² × {src.quantity} pieces = {src.exact_total_length_or_area:.4f} m²")
+                    ("Inputs", f"{src.quantity} pcs @ {src.length_mm:.0f}x{src.width_mm:.0f} mm"),
+                    ("Step 1", f"Area: ({src.length_mm:.0f} × {src.width_mm:.0f}) / 1000000 = {area_per_piece:.4f} m²"),
+                    ("Step 2", f"Total: {area_per_piece:.4f} × {src.quantity} = {src.exact_total_length_or_area:.4f} m²")
                 ]
             else:
                 len_m = src.length_mm / 1000.0
                 props = [
-                    ("Inputs", f"{src.quantity} pieces at {src.length_mm:.0f} mm"),
-                    ("Step 1", f"Convert Length: {src.length_mm:.0f} mm ÷ 1000 = {len_m:.2f} meters"),
-                    ("Step 2", f"Total Length: {len_m:.2f} m × {src.quantity} pieces = {src.exact_total_length_or_area:.2f} meters")
+                    ("Inputs", f"{src.quantity} pcs @ {src.length_mm:.0f} mm"),
+                    ("Step 1", f"Length: {src.length_mm:.0f} / 1000 = {len_m:.3f} m"),
+                    ("Step 2", f"Total: {len_m:.3f} m × {src.quantity} = {src.exact_total_length_or_area:.4f} m")
                 ]
                 
             _, outs = self.draw_node(
@@ -121,13 +119,13 @@ class BlueprintMathWindow(ctk.CTkToplevel):
         # --- Column 1: Aggregator Node (The Convergence) ---
         agg_in_pins = [f"Item {i+1} \u25B6" for i in range(total_sources)]
         
-        math_str = " + ".join([f"{src.exact_total_length_or_area:.2f}" if not src.is_plate else f"{src.exact_total_length_or_area:.4f}" for src in drawing_sources])
+        math_str = " + ".join([f"{src.exact_total_length_or_area:.4f}" for src in drawing_sources])
         unit = "meters" if not summary_item.is_plate else "m²"
         
         agg_props = [
-            ("Action", "Gathering all cuts from drawings above..."),
-            ("Math", f"{math_str} = {summary_item.grand_total_length_or_area:.4f} {unit}"),
-            ("Result", f"Grand Total Needed = {summary_item.grand_total_length_or_area:.4f} {unit}")
+            ("Action", "Gathering all cuts..."),
+            ("Math", f"{math_str}"),
+            ("Result", f"Total = {summary_item.grand_total_length_or_area:.4f} {unit}")
         ]
         
         agg_ins, agg_outs = self.draw_node(
@@ -142,20 +140,18 @@ class BlueprintMathWindow(ctk.CTkToplevel):
             raw_sheets = summary_item.grand_total_length_or_area / sheet_area
             
             strat_props = [
-                ("Rule", "Testing standard sheet sizes to find lowest scrap."),
-                ("Winner", f"{summary_item.recommended_plate_size} is the most efficient."),
-                ("Math", f"Area of 1 winner sheet = {sheet_area:.4f} m²"),
-                ("Math", f"{summary_item.grand_total_length_or_area:.4f} m² ÷ {sheet_area:.4f} m² = {raw_sheets:.2f} sheets"),
-                ("Rule", "Rounding up to nearest full sheet."),
-                ("Result", f"We must order {summary_item.standard_bars_to_order} full sheets.")
+                ("Rule", "Testing standard sizes."),
+                ("Winner", f"{summary_item.recommended_plate_size}"),
+                ("Sheet Area", f"{sheet_area:.4f} m²"),
+                ("Math", f"{summary_item.grand_total_length_or_area:.4f} / {sheet_area:.4f} = {raw_sheets:.4f}"),
+                ("Action", f"Rounding up to {summary_item.standard_bars_to_order} sheets.")
             ]
         else:
             raw_bars = summary_item.grand_total_length_or_area / 12.0
             strat_props = [
-                ("Rule", "We must buy full 12.0 meter bars from the market."),
-                ("Math", f"{summary_item.grand_total_length_or_area:.2f} meters needed ÷ 12.0 m = {raw_bars:.2f} bars"),
-                ("Rule", "You cannot buy a fraction of a bar. Rounding up."),
-                ("Result", f"We must order {summary_item.standard_bars_to_order} full bars.")
+                ("Rule", "Buying full 12.0m bars."),
+                ("Math", f"{summary_item.grand_total_length_or_area:.4f} m / 12.0 = {raw_bars:.4f} bars"),
+                ("Action", f"Rounding up to order {summary_item.standard_bars_to_order} bars.")
             ]
             
         strat_ins, strat_outs = self.draw_node(
@@ -167,15 +163,15 @@ class BlueprintMathWindow(ctk.CTkToplevel):
         # --- Column 3: Final Output Node (The Billing) ---
         if summary_item.is_plate:
              final_props = [
-                ("Fact", f"This plate weighs {summary_item.unit_weight:.2f} kg per m²."),
-                ("Math", f"{summary_item.standard_bars_to_order} sheets × {sheet_area:.4f} m² × {summary_item.unit_weight:.2f} kg/m² = {summary_item.commercial_weight_kg:.2f} kg"),
-                ("Math", f"{summary_item.commercial_weight_kg:.2f} kg ÷ 1000 = {summary_item.tonnage_mt:.3f} Metric Tons (MT)")
+                ("Unit Wt", f"{summary_item.unit_weight:.2f} kg/m²"),
+                ("Billed Wt", f"{summary_item.standard_bars_to_order} × {sheet_area:.4f} × {summary_item.unit_weight:.2f} = {summary_item.commercial_weight_kg:.2f} kg"),
+                ("Tonnage", f"{summary_item.commercial_weight_kg:.2f} / 1000 = {summary_item.tonnage_mt:.3f} MT")
             ]
         else:
             final_props = [
-                ("Fact", f"A 12.0m bar weighs {summary_item.unit_weight:.2f} kg per meter."),
-                ("Math", f"{summary_item.standard_bars_to_order} bars × 12.0 m × {summary_item.unit_weight:.2f} kg/m = {summary_item.commercial_weight_kg:.2f} kg"),
-                ("Math", f"{summary_item.commercial_weight_kg:.2f} kg ÷ 1000 = {summary_item.tonnage_mt:.3f} Metric Tons (MT)")
+                ("Unit Wt", f"{summary_item.unit_weight:.2f} kg/m"),
+                ("Billed Wt", f"{summary_item.standard_bars_to_order} × 12.0 × {summary_item.unit_weight:.2f} = {summary_item.commercial_weight_kg:.2f} kg"),
+                ("Tonnage", f"{summary_item.commercial_weight_kg:.2f} / 1000 = {summary_item.tonnage_mt:.3f} MT")
             ]
             
         final_ins, _ = self.draw_node(
@@ -194,7 +190,6 @@ class BlueprintMathWindow(ctk.CTkToplevel):
         
         self.canvas.configure(scrollregion=(0, 0, col3_x + node_width + 100, max(700, (total_sources * y_spacing) + 100)))
 
-# STREAMING_CHUNK:Implementing the node rendering and bezier splines...
     def draw_grid(self):
         for i in range(0, 4000, 20):
             color = "#2a2a2a" if i % 100 == 0 else "#222222"
@@ -241,12 +236,10 @@ class BlueprintMathWindow(ctk.CTkToplevel):
         if pins_rows > 0 and prop_rows > 0:
             current_y += 10 # Drop down safely below pins
             
-        # Draw Properties (Left Aligned for readability of formulas)
+        # Draw Properties using Fixed Columns (Label at x+15, Value at x+95)
         for p_name, p_val in properties:
-            self.canvas.create_text(x+10, current_y, text=f"{p_name}: ", fill="#aaaaaa", font=("Segoe UI", 9, "bold"), anchor="w")
-            # Calculate width of the label to offset the value text
-            label_w = self.canvas.bbox(self.canvas.create_text(0, 0, text=f"{p_name}: ", font=("Segoe UI", 9, "bold")))[2]
-            self.canvas.create_text(x+10+label_w, current_y, text=f"{p_val}", fill="#e2e8f0", font=("Consolas", 9), anchor="w")
+            self.canvas.create_text(x+15, current_y, text=f"{p_name}:", fill="#aaaaaa", font=("Segoe UI", 9, "bold"), anchor="w")
+            self.canvas.create_text(x+95, current_y, text=f"{p_val}", fill="#e2e8f0", font=("Consolas", 9), anchor="w")
             current_y += row_h
 
         return in_coords, out_coords
@@ -263,7 +256,6 @@ class BlueprintMathWindow(ctk.CTkToplevel):
         self.canvas.create_line(x1, y1, cx1, cy1, cx2, cy2, x2, y2, smooth=True, fill=color, width=2)
 
 
-# STREAMING_CHUNK:Building the Multi-Tabbed Report Window and Exporter...
 class ReportWindow(ctk.CTkToplevel):
     def __init__(self, parent, project_result):
         super().__init__(parent)
@@ -370,7 +362,6 @@ class ReportWindow(ctk.CTkToplevel):
         except Exception as e:
             tkmb.showerror("Export Error", f"Failed to save file:\n{e}")
 
-# STREAMING_CHUNK:Building the Multi-Tiered Tabbed App...
 class SteelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
